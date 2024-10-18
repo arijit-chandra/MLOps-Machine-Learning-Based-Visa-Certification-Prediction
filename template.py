@@ -26,6 +26,8 @@ list_of_files = [
     f"{project_name}/pipline/training_pipeline.py",
     f"{project_name}/pipline/prediction_pipeline.py",
     "notebook/EDA.ipynb",
+    "notebook/Feature_Engineering_Model_Training.ipynb",
+    "notebook/mongodb_demo.ipynb",
     "templates/demo.html",
     "static/css/style.css",
     "requirements.txt",
