@@ -1,3 +1,4 @@
+### artifact_entity.py file
 from dataclasses import dataclass, field
 from typing import Optional
 from pathlib import Path
@@ -136,7 +137,7 @@ class ModelEvaluationArtifact:
     """
     is_model_accepted: bool
     changed_accuracy: float
-    s3_model_path: str
+    blob_model_path: str
     trained_model_path: Path
     
     def __post_init__(self):
@@ -160,23 +161,23 @@ class ModelEvaluationArtifact:
 class ModelPusherArtifact:
     """
     Artifact class for storing model deployment information.
-    Contains S3 bucket details and model path.
+    Contains Azure Blob Storage container details and model path.
     """
-    bucket_name: str
-    s3_model_path: str
+    container_name: str
+    blob_model_path: str
 
     def __post_init__(self):
         try:
-            # Basic validation of bucket name and path
-            if not self.bucket_name or not self.bucket_name.strip():
-                raise USvisaException("Bucket name cannot be empty")
-            if not self.s3_model_path or not self.s3_model_path.strip():
-                raise USvisaException("S3 model path cannot be empty")
+            # Basic validation of container name and path
+            if not self.container_name or not self.container_name.strip():
+                raise USvisaException("Container name cannot be empty")
+            if not self.blob_model_path or not self.blob_model_path.strip():
+                raise USvisaException("Blob model path cannot be empty")
             
             logging.info(f"Model pusher artifact validated: {self}")
         except Exception as e:
             raise USvisaException(f"Error in ModelPusherArtifact validation: {e}") from e
 
-    def get_s3_uri(self) -> str:
-        """Generate full S3 URI for the model."""
-        return f"s3://{self.bucket_name}/{self.s3_model_path}"
+    def get_blob_uri(self) -> str:
+        """Generate full Azure Blob Storage URI for the model."""
+        return f"https://{self.container_name}.blob.core.windows.net/{self.blob_model_path}"

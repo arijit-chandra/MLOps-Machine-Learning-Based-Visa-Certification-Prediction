@@ -25,6 +25,8 @@ list_of_files = [
     f"{project_name}/pipline/__init__.py",
     f"{project_name}/pipline/training_pipeline.py",
     f"{project_name}/pipline/prediction_pipeline.py",
+    f"{project_name}/data_access/__init__.py",
+    f"{project_name}/data_access/easyvisa_data.py",
     "notebook/EDA.ipynb",
     "notebook/Feature_Engineering_Model_Training.ipynb",
     "notebook/mongodb_demo.ipynb",

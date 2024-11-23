@@ -4,7 +4,7 @@ import dill
 import yaml
 import numpy as np
 from pandas import DataFrame
-from us_visa_prediction.exception import VisaException
+from us_visa_prediction.exception import USvisaException
 from us_visa_prediction.logger import logging
 
 
@@ -18,7 +18,7 @@ def read_yaml_file(file_path: str) -> dict:
         with open(file_path, "rb") as yaml_file:
             return yaml.safe_load(yaml_file)
     except Exception as e:
-        raise VisaException(f"Error reading YAML file: {file_path}", sys) from e
+        raise USvisaException(f"Error reading YAML file: {file_path}", sys) from e
 
 
 def write_yaml_file(file_path: str, content: object, replace: bool = False) -> None:
@@ -35,7 +35,7 @@ def write_yaml_file(file_path: str, content: object, replace: bool = False) -> N
         with open(file_path, "w") as file:
             yaml.dump(content, file)
     except Exception as e:
-        raise VisaException(f"Error writing to YAML file: {file_path}", sys) from e
+        raise USvisaException(f"Error writing to YAML file: {file_path}", sys) from e
 
 
 def load_object(file_path: str) -> object:
@@ -51,7 +51,7 @@ def load_object(file_path: str) -> object:
         logging.info(f"Object loaded successfully from {file_path}")
         return obj
     except Exception as e:
-        raise VisaException(f"Error loading object from file: {file_path}", sys) from e
+        raise USvisaException(f"Error loading object from file: {file_path}", sys) from e
 
 
 def save_numpy_array_data(file_path: str, array: np.array) -> None:
@@ -66,7 +66,7 @@ def save_numpy_array_data(file_path: str, array: np.array) -> None:
             np.save(file_obj, array)
         logging.info(f"Numpy array saved successfully at {file_path}")
     except Exception as e:
-        raise VisaException(f"Error saving numpy array to file: {file_path}", sys) from e
+        raise USvisaException(f"Error saving numpy array to file: {file_path}", sys) from e
 
 
 def load_numpy_array_data(file_path: str) -> np.array:
@@ -81,7 +81,7 @@ def load_numpy_array_data(file_path: str) -> np.array:
         logging.info(f"Numpy array loaded successfully from {file_path}")
         return array
     except Exception as e:
-        raise VisaException(f"Error loading numpy array from file: {file_path}", sys) from e
+        raise USvisaException(f"Error loading numpy array from file: {file_path}", sys) from e
 
 
 def save_object(file_path: str, obj: object) -> None:
@@ -97,7 +97,7 @@ def save_object(file_path: str, obj: object) -> None:
             dill.dump(obj, file_obj)
         logging.info(f"Object saved successfully at {file_path}")
     except Exception as e:
-        raise VisaException(f"Error saving object to file: {file_path}", sys) from e
+        raise USvisaException(f"Error saving object to file: {file_path}", sys) from e
 
 
 def drop_columns(df: DataFrame, cols: list) -> DataFrame:
@@ -113,4 +113,4 @@ def drop_columns(df: DataFrame, cols: list) -> DataFrame:
         logging.info(f"Columns {cols} dropped successfully")
         return df
     except Exception as e:
-        raise VisaException(f"Error dropping columns {cols} from DataFrame", sys) from e
+        raise USvisaException(f"Error dropping columns {cols} from DataFrame", sys) from e

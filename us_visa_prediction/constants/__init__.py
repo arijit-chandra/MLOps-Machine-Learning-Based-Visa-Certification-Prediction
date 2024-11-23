@@ -4,11 +4,10 @@ from datetime import date
 from typing import Final
 
 from us_visa_prediction.logger import logging
-from us_visa_prediction.exception import USvisaException
 
 try:
     # Database related constants
-    DATABASE_NAME: Final[str] = "US_VISA"
+    DATABASE_NAME: Final[str] = "EASY_VISA"
     COLLECTION_NAME: Final[str] = "visa_data"
     MONGODB_URL_KEY: Final[str] = "MONGODB_URL"
 
@@ -51,59 +50,60 @@ try:
     MODEL_TRAINER_MODEL_CONFIG_FILE_PATH: Final[str] = os.path.join("config", "model.yaml")
 
     # Model Evaluation Configuration
-    MODEL_EVALUATION_CHANGED_THRESHOLD_SCORE: Final[float] = 0.02
+    MODEL_EVALUATION_CHANGED_THRESHOLD_SCORE: Final[float] = 0.07
 
-    # S3 Bucket Configuration
-    MODEL_BUCKET_NAME: Final[str] = "us-visa-model-bucket"
+    # Azure Blob Storage Configuration
+    MODEL_CONTAINER_NAME: Final[str] = "us-visa-model-container"
+    AZURE_STORAGE_CONNECTION_STRING: Final[str] = "AZURE_STORAGE_CONNECTION_STRING"
 
     # Application Configuration
     APP_HOST: Final[str] = "0.0.0.0"
     APP_PORT: Final[int] = 8080
 
 except Exception as e:
-    raise USvisaException(e, sys) from e
+    raise Exception(e) from e
 
 def validate_configurations() -> None:
     """
     Validate all configuration settings.
     
     Raises:
-        USvisaException: If any configuration validation fails
+        Exception: If any configuration validation fails
     """
     try:
         logging.info("Validating configurations...")
         
         # Validate file paths
         if not os.path.exists(SCHEMA_FILE_PATH):
-            raise USvisaException(f"Schema file not found at {SCHEMA_FILE_PATH}", sys)
+            raise Exception(f"Schema file not found at {SCHEMA_FILE_PATH}")
             
         if not os.path.exists(MODEL_TRAINER_MODEL_CONFIG_FILE_PATH):
-            raise USvisaException(f"Model config file not found at {MODEL_TRAINER_MODEL_CONFIG_FILE_PATH}", sys)
+            raise Exception(f"Model config file not found at {MODEL_TRAINER_MODEL_CONFIG_FILE_PATH}")
         
         # Validate numeric values
         if not 0 < DATA_INGESTION_TRAIN_TEST_SPLIT_RATIO < 1:
-            raise USvisaException(f"Invalid train-test split ratio: {DATA_INGESTION_TRAIN_TEST_SPLIT_RATIO}", sys)
+            raise Exception(f"Invalid train-test split ratio: {DATA_INGESTION_TRAIN_TEST_SPLIT_RATIO}")
             
         if not 0 <= MODEL_TRAINER_EXPECTED_SCORE <= 1:
-            raise USvisaException(f"Invalid expected score: {MODEL_TRAINER_EXPECTED_SCORE}", sys)
+            raise Exception(f"Invalid expected score: {MODEL_TRAINER_EXPECTED_SCORE}")
             
         if not 0 <= MODEL_EVALUATION_CHANGED_THRESHOLD_SCORE <= 1:
-            raise USvisaException(f"Invalid threshold score: {MODEL_EVALUATION_CHANGED_THRESHOLD_SCORE}", sys)
+            raise Exception(f"Invalid threshold score: {MODEL_EVALUATION_CHANGED_THRESHOLD_SCORE}")
             
         if not 0 <= APP_PORT <= 65535:
-            raise USvisaException(f"Invalid port number: {APP_PORT}", sys)
+            raise Exception(f"Invalid port number: {APP_PORT}")
         
         logging.info("All configurations validated successfully")
     except Exception as e:
         logging.error(f"Configuration validation failed: {str(e)}")
-        raise USvisaException(e, sys) from e
+        raise Exception(e) from e
 
 def create_directories() -> None:
     """
     Create necessary directories for the pipeline.
     
     Raises:
-        USvisaException: If directory creation fails
+        Exception: If directory creation fails
     """
     try:
         directories = [
@@ -124,7 +124,7 @@ def create_directories() -> None:
             
     except Exception as e:
         logging.error(f"Failed to create directories: {str(e)}")
-        raise USvisaException(e, sys) from e
+        raise Exception(e) from e
 
 # Initialize configurations on module import
 try:
@@ -134,4 +134,4 @@ try:
     logging.info("Configuration initialization completed successfully")
 except Exception as e:
     logging.critical(f"Failed to initialize configurations: {str(e)}")
-    raise USvisaException(e, sys) from e
+    raise Exception(e) from e

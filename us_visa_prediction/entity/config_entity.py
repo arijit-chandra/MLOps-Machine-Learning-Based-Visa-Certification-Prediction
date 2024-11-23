@@ -1,3 +1,4 @@
+### config_entity.py file
 import os
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -138,20 +139,20 @@ class ModelTrainerConfig:
 class ModelEvaluationConfig:
     """Configuration for model evaluation phase."""
     changed_threshold_score: float = field(default=MODEL_EVALUATION_CHANGED_THRESHOLD_SCORE)
-    bucket_name: str = field(default=MODEL_BUCKET_NAME)
-    s3_model_key_path: str = field(default=MODEL_FILE_NAME)
+    container_name: str = field(default=MODEL_CONTAINER_NAME)
+    blob_model_key_path: str = field(default=MODEL_FILE_NAME)
 
 @dataclass(frozen=True)
 class ModelPusherConfig:
     """Configuration for model pushing phase."""
-    bucket_name: str = field(default=MODEL_BUCKET_NAME)
-    s3_model_key_path: str = field(default=MODEL_FILE_NAME)
+    container_name: str = field(default=MODEL_CONTAINER_NAME)
+    blob_model_key_path: str = field(default=MODEL_FILE_NAME)
 
 @dataclass(frozen=True)
 class USvisaPredictorConfig:
     """Configuration for US visa prediction service."""
     model_file_path: str = field(default=MODEL_FILE_NAME)
-    model_bucket_name: str = field(default=MODEL_BUCKET_NAME)
+    model_container_name: str = field(default=MODEL_CONTAINER_NAME)
 
 # Initialize the training pipeline configuration
 try:
