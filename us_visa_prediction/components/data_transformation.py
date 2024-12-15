@@ -93,6 +93,15 @@ class DataTransformation:
                 train_df = self._perform_feature_engineering(train_df)
                 test_df = self._perform_feature_engineering(test_df)
 
+                # Before dropping
+                print("Train dataset shape before dropping NaNs:", train_df.shape)
+                train_df = train_df.dropna()
+                print("Train dataset shape after dropping NaNs:", train_df.shape)
+
+                print("Test dataset shape before dropping NaNs:", test_df.shape)
+                test_df = test_df.dropna()
+                print("Test dataset shape after dropping NaNs:", test_df.shape)
+
                 input_feature_train_df = train_df.drop(columns=[TARGET_COLUMN], axis=1)
                 target_feature_train_df = train_df[TARGET_COLUMN]
                 

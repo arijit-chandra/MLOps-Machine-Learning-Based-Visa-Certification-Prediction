@@ -1,18 +1,24 @@
-from us_visa_prediction.entity.config_entity import ModelEvaluationConfig
-from us_visa_prediction.entity.artifact_entity import ModelTrainerArtifact, DataIngestionArtifact, ModelEvaluationArtifact
-from sklearn.metrics import f1_score
-from us_visa_prediction.exception import USvisaException
-from us_visa_prediction.constants import TARGET_COLUMN, CURRENT_YEAR
-from us_visa_prediction.logger import logging
-from us_visa_prediction.cloud_storage.azure_storage import AzureStorageService
 import sys
-import numpy as np
-import pandas as pd
-from typing import Optional
-from us_visa_prediction.entity.cloud_estimator import USvisaEstimator  
+import pickle
 from dataclasses import dataclass
-from us_visa_prediction.entity.estimator import USvisaModel
+from typing import Optional
+
+import pandas as pd
+import numpy as np
+from sklearn.metrics import f1_score
+
+from us_visa_prediction.entity.config_entity import ModelEvaluationConfig
+from us_visa_prediction.cloud_storage.azure_storage import AzureStorageService
+from us_visa_prediction.entity.artifact_entity import (
+    DataIngestionArtifact, 
+    ModelTrainerArtifact, 
+    ModelEvaluationArtifact
+)
+from us_visa_prediction.constants import CURRENT_YEAR, TARGET_COLUMN
+from us_visa_prediction.exception import USvisaException
+from us_visa_prediction.logger import logging
 from us_visa_prediction.entity.estimator import TargetValueMapping
+from us_visa_prediction.utils.main_utils import save_object, load_object
 
 @dataclass
 class EvaluateModelResponse:
@@ -22,112 +28,130 @@ class EvaluateModelResponse:
     difference: float
 
 class ModelEvaluation:
-    def __init__(self, model_eval_config: ModelEvaluationConfig, 
-                 data_ingestion_artifact: DataIngestionArtifact,
-                 model_trainer_artifact: ModelTrainerArtifact):
+    def __init__(
+        self, 
+        model_eval_config: ModelEvaluationConfig,
+        data_ingestion_artifact: DataIngestionArtifact,
+        model_trainer_artifact: ModelTrainerArtifact
+    ):
+        """
+        Initialize Model Evaluation
+        
+        Args:
+            model_eval_config (ModelEvaluationConfig): Model evaluation configuration
+            data_ingestion_artifact (DataIngestionArtifact): Data ingestion artifact
+            model_trainer_artifact (ModelTrainerArtifact): Model trainer artifact
+        """
         try:
+            logging.info(f"{'=' * 20} Model Evaluation {'=' * 20}")
             self.model_eval_config = model_eval_config
             self.data_ingestion_artifact = data_ingestion_artifact
             self.model_trainer_artifact = model_trainer_artifact
-            self.azure_storage = AzureStorageService(
-                container_name=model_eval_config.container_name
+            logging.info(f"Initialize Model Evaluation container_name: {self.model_eval_config.container_name}")
+            # Azure storage service for model management
+            self.azure_storage_service = AzureStorageService(
+                container_name=self.model_eval_config.container_name
             )
         except Exception as e:
-            raise USvisaException(e, sys) from e
+            raise USvisaException(e, sys)
 
-    def _perform_feature_engineering(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Perform feature engineering steps including log transforms and percentiles"""
+    def get_best_model(self):
+        """
+        Get the best model from Azure storage
+        
+        Returns:
+            Loaded model or None if no model exists
+        """
         try:
-            # Add company age
-            df['company_age'] = CURRENT_YEAR - df['yr_of_estab']
-            
-            # Log transformations
-            df['log_company_age'] = np.log1p(df['company_age'])
-            df['log_no_of_employees'] = np.log1p(df['no_of_employees'])
-            
-            # Wage percentiles by continent
-            df['wage_percentile'] = df.groupby('continent')['prevailing_wage'].rank(pct=True)
-            
-            logging.info("Added engineered features: log transforms and wage percentiles")
-            return df
-        except Exception as e:
-            raise USvisaException(e, sys) from e
-
-    def get_best_model(self) -> Optional[USvisaEstimator]:
-        try:
-            container_name = self.model_eval_config.container_name  
-            model_path = self.model_eval_config.model_path
-            
-            if not self.azure_storage.is_blob_exists(model_path):
-                return None
-            
-            usvisa_estimator = USvisaEstimator(
-                container_name=container_name,
-                model_path=model_path
-            )
-            return usvisa_estimator
-        except Exception as e:
-            logging.error(f"Error retrieving best model: {e}")
+            blob_name = self.model_eval_config.blob_model_key_path
+            if self.azure_storage_service.is_blob_exists(blob_name):
+                # Download blob content as bytes
+                existing_model_blob = self.azure_storage_service.download_blob(blob_name)
+                
+                # Create a temporary file path for the model
+                existing_model_path = str(self.model_eval_config.model_path)
+                
+                # Save the downloaded bytes to a file
+                with open(existing_model_path, 'wb') as f:
+                    f.write(existing_model_blob)
+                
+                # Load the model using pickle
+                with open(existing_model_path, 'rb') as f:
+                    return pickle.load(f)
             return None
-
-    def evaluate_model(self) -> EvaluateModelResponse:
-        try:
-            # Load and prepare test data
-            test_df = pd.read_csv(self.data_ingestion_artifact.test_file_path)
-            
-            # Apply feature engineering
-            test_df = self._perform_feature_engineering(test_df)
-
-            # Separate features and target
-            x, y = test_df.drop(TARGET_COLUMN, axis=1), test_df[TARGET_COLUMN]
-            
-            # Convert target values using mapping
-            y = y.replace(TargetValueMapping()._asdict())
-
-            # Load and evaluate trained model
-            trained_model = USvisaModel(
-                model_file_path=self.model_trainer_artifact.trained_model_file_path
-            )
-            y_hat_trained = trained_model.predict(x)
-            trained_model_f1_score = f1_score(y, y_hat_trained)
-
-            # Evaluate production model if available
-            best_model_f1_score = None
-            best_model = self.get_best_model()
-            if best_model is not None:
-                y_hat_best_model = best_model.predict(x)
-                best_model_f1_score = f1_score(y, y_hat_best_model)
-            
-            # Compare models
-            tmp_best_model_score = 0 if best_model_f1_score is None else best_model_f1_score
-            
-            result = EvaluateModelResponse(
-                trained_model_f1_score=trained_model_f1_score,
-                best_model_f1_score=best_model_f1_score,
-                is_model_accepted=trained_model_f1_score > tmp_best_model_score,
-                difference=trained_model_f1_score - tmp_best_model_score
-            )
-            
-            logging.info(f"Model evaluation result: {result}")
-            return result
-
         except Exception as e:
-            raise USvisaException(e, sys) from e
+            logging.error(f"Error getting best model: {e}")
+            raise USvisaException(e, sys)
 
     def initiate_model_evaluation(self) -> ModelEvaluationArtifact:
+        """
+        Evaluate and compare models
+        
+        Returns:
+            ModelEvaluationArtifact: Result of model evaluation
+        """
         try:
-            evaluate_model_response = self.evaluate_model()
-            azure_model_path = self.model_eval_config.model_path
+            # Load test data
+            test_df = pd.read_csv(self.data_ingestion_artifact.test_file_path)
+            
+            # Perform feature engineering
+            test_df['company_age'] = CURRENT_YEAR - test_df['yr_of_estab']
+            
+            # Log transformations
+            test_df['log_company_age'] = np.log1p(test_df['company_age'])
+            test_df['log_no_of_employees'] = np.log1p(test_df['no_of_employees'])
+            
+            # Wage percentiles by continent
+            test_df['wage_percentile'] = test_df.groupby('continent')['prevailing_wage'].rank(pct=True)
 
-            model_evaluation_artifact = ModelEvaluationArtifact(
-                is_model_accepted=evaluate_model_response.is_model_accepted,
-                azure_model_path=azure_model_path,
-                trained_model_path=self.model_trainer_artifact.trained_model_file_path,
-                changed_accuracy=evaluate_model_response.difference
+            # Prepare features and target
+            x_test = test_df.drop(TARGET_COLUMN, axis=1)
+            y_test = test_df[TARGET_COLUMN].replace(
+                TargetValueMapping()._asdict()
             )
 
-            logging.info(f"Model evaluation artifact: {model_evaluation_artifact}")
+            # Evaluate trained model
+            trained_model_f1_score = self.model_trainer_artifact.metric_artifact.f1_score
+
+            # Get best existing model
+            best_model = self.get_best_model()
+            best_model_f1_score = None
+
+            # Evaluate best model if exists
+            if best_model is not None:
+                y_pred_best_model = best_model.predict(x_test)
+                best_model_f1_score = f1_score(y_test, y_pred_best_model, average='weighted')
+
+            # Determine model acceptance
+            tmp_best_model_score = 0 if best_model_f1_score is None else best_model_f1_score
+            is_model_accepted = trained_model_f1_score > tmp_best_model_score
+            changed_accuracy = trained_model_f1_score - tmp_best_model_score
+
+            # Create model evaluation artifact
+            model_evaluation_artifact = ModelEvaluationArtifact(
+                is_model_accepted=is_model_accepted,
+                changed_accuracy=changed_accuracy,
+                blob_model_path=self.model_eval_config.blob_model_key_path,
+                trained_model_path=self.model_trainer_artifact.trained_model_file_path
+            )
+
+            # Push model to storage if accepted
+            if is_model_accepted:
+                blob_name = self.model_eval_config.blob_model_key_path
+                
+                # Use pickle to serialize the model
+                with open(self.model_trainer_artifact.trained_model_file_path, 'rb') as model_file:
+                    model_bytes = model_file.read()
+                
+                # Upload the serialized model
+                self.azure_storage_service.upload_blob(
+                    blob_name=blob_name,
+                    data=model_bytes
+                )
+
+            logging.info(f"Model Evaluation Result: {model_evaluation_artifact}")
             return model_evaluation_artifact
-            
+
         except Exception as e:
-            raise USvisaException(e, sys) from e
+            logging.error(f"Model evaluation failed: {str(e)}")
+            raise USvisaException(f"Failed to evaluate model: {str(e)}", sys) from e

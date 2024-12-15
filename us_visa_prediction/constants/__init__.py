@@ -53,8 +53,8 @@ try:
     MODEL_EVALUATION_CHANGED_THRESHOLD_SCORE: Final[float] = 0.07
 
     # Azure Blob Storage Configuration
-    MODEL_CONTAINER_NAME: Final[str] = "us-visa-model-container"
-    AZURE_STORAGE_CONNECTION_STRING: Final[str] = "AZURE_STORAGE_CONNECTION_STRING"
+    MODEL_CONTAINER_NAME: Final[str] = "usvisamlops"
+    AZURE_ACCOUNT_URL: Final[str] = "STORAGE_CONNECTION_STRING"
 
     # Application Configuration
     APP_HOST: Final[str] = "0.0.0.0"

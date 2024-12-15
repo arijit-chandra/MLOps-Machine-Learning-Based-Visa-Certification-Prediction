@@ -7,7 +7,7 @@ from us_visa_prediction.components.data_validation import DataValidation
 from us_visa_prediction.components.data_transformation import DataTransformation
 from us_visa_prediction.components.model_trainer import ModelTrainer
 from us_visa_prediction.components.model_evaluation import ModelEvaluation
-# from us_visa_prediction.components.model_pusher import ModelPusher
+from us_visa_prediction.components.model_pusher import ModelPusher
 
 from us_visa_prediction.entity.config_entity import (
     DataIngestionConfig,
@@ -15,7 +15,7 @@ from us_visa_prediction.entity.config_entity import (
     DataTransformationConfig,
     ModelTrainerConfig,
     ModelEvaluationConfig,
-    # ModelPusherConfig
+    ModelPusherConfig
 )
 
 from us_visa_prediction.entity.artifact_entity import (
@@ -40,7 +40,7 @@ class TrainPipeline:
             self.data_transformation_config = DataTransformationConfig()
             self.model_trainer_config = ModelTrainerConfig()
             self.model_evaluation_config = ModelEvaluationConfig()
-            # self.model_pusher_config = ModelPusherConfig()
+            self.model_pusher_config = ModelPusherConfig()
             
             logging.info("Training pipeline configurations initialized successfully")
         except Exception as e:
@@ -175,42 +175,43 @@ class TrainPipeline:
                 model_trainer_artifact=model_trainer_artifact
             )
             model_evaluation_artifact = model_evaluation.initiate_model_evaluation()
+            # model_evaluation_artifact = None
             logging.info(f"Model evaluation completed. Artifact: {model_evaluation_artifact}")
             return model_evaluation_artifact
         except Exception as e:
             raise USvisaException("Failed to evaluate model", sys) from e
 
-    # def start_model_pusher(
-    #     self,
-    #     model_evaluation_artifact: ModelEvaluationArtifact
-    # ) -> Optional[ModelPusherArtifact]:
-    #     """
-    #     Initiate the model pushing process if evaluation criteria are met.
+    def start_model_pusher(
+        self,
+        model_evaluation_artifact: ModelEvaluationArtifact
+    ) -> Optional[ModelPusherArtifact]:
+        """
+        Initiate the model pushing process if evaluation criteria are met.
         
-    #     Args:
-    #         model_evaluation_artifact: Artifact from model evaluation phase
+        Args:
+            model_evaluation_artifact: Artifact from model evaluation phase
             
-    #     Returns:
-    #         Optional[ModelPusherArtifact]: Artifact containing pushed model info if successful
+        Returns:
+            Optional[ModelPusherArtifact]: Artifact containing pushed model info if successful
             
-    #     Raises:
-    #         USvisaException: If model pushing fails
-    #     """
-    #     try:
-    #         if not model_evaluation_artifact.is_model_accepted:
-    #             logging.info("Model not accepted for deployment")
-    #             return None
+        Raises:
+            USvisaException: If model pushing fails
+        """
+        try:
+            if not model_evaluation_artifact.is_model_accepted:
+                logging.info("Model not accepted for deployment")
+                return None
                 
-    #         logging.info("Starting model pusher phase")
-    #         model_pusher = ModelPusher(
-    #             model_evaluation_artifact=model_evaluation_artifact,
-    #             model_pusher_config=self.model_pusher_config
-    #         )
-    #         model_pusher_artifact = model_pusher.initiate_model_pusher()
-    #         logging.info(f"Model pushing completed. Artifact: {model_pusher_artifact}")
-    #         return model_pusher_artifact
-    #     except Exception as e:
-    #         raise USvisaException("Failed to push model", sys) from e
+            logging.info("Starting model pusher phase")
+            model_pusher = ModelPusher(
+                model_evaluation_artifact=model_evaluation_artifact,
+                model_pusher_config=self.model_pusher_config
+            )
+            model_pusher_artifact = model_pusher.initiate_model_pusher()
+            logging.info(f"Model pushing completed. Artifact: {model_pusher_artifact}")
+            return model_pusher_artifact
+        except Exception as e:
+            raise USvisaException("Failed to push model", sys) from e
 
     def run_pipeline(self) -> Optional[ModelPusherArtifact]:
         """
@@ -250,13 +251,13 @@ class TrainPipeline:
                 model_trainer_artifact=model_trainer_artifact
             )
             
-            # # Model Pushing (if accepted)
-            # model_pusher_artifact = self.start_model_pusher(
-            #     model_evaluation_artifact=model_evaluation_artifact
-            # )
+            # Model Pushing (if accepted)
+            model_pusher_artifact = self.start_model_pusher(
+                model_evaluation_artifact=model_evaluation_artifact
+            )
             
             logging.info("Training pipeline execution completed successfully")
-            # return model_pusher_artifact
+            return model_pusher_artifact
             
         except Exception as e:
             logging.error("Pipeline execution failed")

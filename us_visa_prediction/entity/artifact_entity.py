@@ -24,6 +24,7 @@ class DataIngestionArtifact:
             
             logging.info(f"Data ingestion artifact validated: {self}")
         except Exception as e:
+            logging.error(f"Error in DataIngestionArtifact validation: {e}")
             raise USvisaException(f"Error in DataIngestionArtifact validation: {e}") from e
 
 @dataclass(frozen=True)
@@ -34,16 +35,18 @@ class DataValidationArtifact:
     """
     validation_status: bool
     message: str
-    drift_report_file_path: Path
+    drift_report_file_path: Optional[Path] = None
 
     def __post_init__(self):
         try:
             # Validate drift report path exists if validation was successful
-            if self.validation_status and not self.drift_report_file_path.exists():
-                raise USvisaException(f"Drift report not found: {self.drift_report_file_path}")
+            if self.validation_status and self.drift_report_file_path:
+                if not self.drift_report_file_path.exists():
+                    raise USvisaException(f"Drift report not found: {self.drift_report_file_path}")
             
             logging.info(f"Data validation artifact validated: {self}")
         except Exception as e:
+            logging.error(f"Error in DataValidationArtifact validation: {e}")
             raise USvisaException(f"Error in DataValidationArtifact validation: {e}") from e
 
 @dataclass(frozen=True)
@@ -71,6 +74,7 @@ class DataTransformationArtifact:
             
             logging.info(f"Data transformation artifact validated: {self}")
         except Exception as e:
+            logging.error(f"Error in DataTransformationArtifact validation: {e}")
             raise USvisaException(f"Error in DataTransformationArtifact validation: {e}") from e
 
 @dataclass(frozen=True)
@@ -100,6 +104,7 @@ class ClassificationMetricArtifact:
             
             logging.info(f"Classification metrics validated: {self}")
         except Exception as e:
+            logging.error(f"Error in ClassificationMetricArtifact validation: {e}")
             raise USvisaException(f"Error in ClassificationMetricArtifact validation: {e}") from e
 
     def to_dict(self) -> dict:
@@ -127,6 +132,7 @@ class ModelTrainerArtifact:
             
             logging.info(f"Model trainer artifact validated: {self}")
         except Exception as e:
+            logging.error(f"Error in ModelTrainerArtifact validation: {e}")
             raise USvisaException(f"Error in ModelTrainerArtifact validation: {e}") from e
 
 @dataclass(frozen=True)
@@ -155,6 +161,7 @@ class ModelEvaluationArtifact:
             
             logging.info(f"Model evaluation artifact validated: {self}")
         except Exception as e:
+            logging.error(f"Error in ModelEvaluationArtifact validation: {e}")
             raise USvisaException(f"Error in ModelEvaluationArtifact validation: {e}") from e
 
 @dataclass(frozen=True)
@@ -176,6 +183,7 @@ class ModelPusherArtifact:
             
             logging.info(f"Model pusher artifact validated: {self}")
         except Exception as e:
+            logging.error(f"Error in ModelPusherArtifact validation: {e}")
             raise USvisaException(f"Error in ModelPusherArtifact validation: {e}") from e
 
     def get_blob_uri(self) -> str:
