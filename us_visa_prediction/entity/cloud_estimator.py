@@ -34,19 +34,16 @@ class USvisaEstimator:
     def load_model(self) -> object:
         """
         Load model from Azure storage
-       
-        Returns:
-            object: Loaded machine learning model
         """
         temp_file = "temp_model.pkl"
         try:
             # Download blob content directly
             model_content = self.azure_storage.download_blob(self.model_path)
             
-            # Save to temp file
+            # Save to temp file without encoding
             with open(temp_file, 'wb') as f:
-                f.write(model_content.encode('latin1'))
-           
+                f.write(model_content)
+            
             # Load model
             model = joblib.load(temp_file)
             

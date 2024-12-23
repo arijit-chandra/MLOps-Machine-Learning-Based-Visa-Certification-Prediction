@@ -1,22 +1,19 @@
-from dataclasses import dataclass
+# us_visa_data.py
 import sys
-import numpy as np
+from typing import Dict, Union
 import pandas as pd
-from typing import Optional
 from pandas import DataFrame
-
-from us_visa_prediction.entity.config_entity import USvisaPredictorConfig
-from us_visa_prediction.entity.estimator import TargetValueMapping
-from us_visa_prediction.cloud_storage.azure_storage import AzureStorageService
 from us_visa_prediction.exception import USvisaException
 from us_visa_prediction.logger import logging
-from us_visa_prediction.constants import CURRENT_YEAR
+# from us_visa_prediction.utils.main_utils import read_yaml_file
 from us_visa_prediction.entity.cloud_estimator import USvisaEstimator
+from dataclasses import dataclass
+from typing import Optional
 
 @dataclass
 class USvisaData:
     """
-    Data class to hold input features for US visa prediction
+    Data class for US visa prediction input features
     """
     continent: str
     education_of_employee: str
@@ -27,14 +24,37 @@ class USvisaData:
     prevailing_wage: float
     unit_of_wage: str
     full_time_position: bool
-    yr_of_estab: int
+    company_age: int
 
     def get_usvisa_input_data_frame(self) -> DataFrame:
         """
-        Convert the input data into a pandas DataFrame
+        Convert input data to DataFrame
+        
+        Returns:
+            DataFrame: Input data as pandas DataFrame
+        
+        Raises:
+            USvisaException: If conversion fails
         """
         try:
-            input_data = {
+            input_dict = self._get_usvisa_data_as_dict()
+            return pd.DataFrame(input_dict)
+        except Exception as e:
+            logging.error(f"Failed to create DataFrame from input data: {str(e)}")
+            raise USvisaException(e, sys) from e
+
+    def _get_usvisa_data_as_dict(self) -> Dict[str, list]:
+        """
+        Convert input data to dictionary format
+        
+        Returns:
+            Dict[str, list]: Input data as dictionary
+        
+        Raises:
+            USvisaException: If conversion fails
+        """
+        try:
+            return {
                 "continent": [self.continent],
                 "education_of_employee": [self.education_of_employee],
                 "has_job_experience": [self.has_job_experience],
@@ -44,133 +64,103 @@ class USvisaData:
                 "prevailing_wage": [self.prevailing_wage],
                 "unit_of_wage": [self.unit_of_wage],
                 "full_time_position": [self.full_time_position],
-                "yr_of_estab": [self.yr_of_estab]
+                "company_age": [self.company_age],
             }
-            return pd.DataFrame(input_data)
         except Exception as e:
+            logging.error(f"Failed to convert input data to dictionary: {str(e)}")
             raise USvisaException(e, sys) from e
 
-class USvisaPredictor:
-    def __init__(self, config: USvisaPredictorConfig):
+class USvisaClassifier:
+    """
+    Classifier for US visa prediction using cloud-stored model
+    """
+    def __init__(self, prediction_pipeline_config: Optional[Dict] = None) -> None:
         """
-        Initialize the US visa predictor with configuration
+        Initialize classifier with configuration
         
         Args:
-            config: Configuration object containing Azure storage details
+            prediction_pipeline_config: Configuration for prediction pipeline
         """
         try:
-            self.config = config
-            self.azure_storage = AzureStorageService(
-                container_name=config.container_name
+            self.prediction_pipeline_config = prediction_pipeline_config or {}
+            self.model_container = self.prediction_pipeline_config.get('model_container_name', 'models')
+            self.model_path = self.prediction_pipeline_config.get('model_file_path', 'visa_model.pkl')
+            
+            logging.info(f"Initialized USvisaClassifier with container: {self.model_container}")
+            
+            self.estimator = USvisaEstimator(
+                container_name=self.model_container,
+                model_path=self.model_path
             )
         except Exception as e:
+            logging.error(f"Failed to initialize USvisaClassifier: {str(e)}")
             raise USvisaException(e, sys) from e
 
-    def _perform_feature_engineering(self, df: pd.DataFrame) -> pd.DataFrame:
+    def predict(self, dataframe: DataFrame) -> Union[str, list]:
         """
-        Perform feature engineering on input data
+        Make prediction using the model
         
         Args:
-            df: Input DataFrame
+            dataframe: Input data for prediction
             
         Returns:
-            DataFrame with engineered features
+            Union[str, list]: Prediction result
+            
+        Raises:
+            USvisaException: If prediction fails
         """
         try:
-            # Create a copy to avoid modifying input
-            df = df.copy()
+            logging.info("Starting prediction process")
             
-            # Add company age
-            df['company_age'] = CURRENT_YEAR - df['yr_of_estab']
+            if not isinstance(dataframe, DataFrame):
+                raise ValueError("Input must be a pandas DataFrame")
+                
+            if dataframe.empty:
+                raise ValueError("Input DataFrame is empty")
+                
+            result = self.estimator.predict(dataframe)
+            logging.info("Prediction completed successfully")
             
-            # Log transformations
-            df['log_company_age'] = np.log1p(df['company_age'])
-            df['log_no_of_employees'] = np.log1p(df['no_of_employees'])
-            
-            # Handle wage percentiles for single predictions
-            if len(df) == 1:
-                df['wage_percentile'] = 0.5  # Use median percentile for single predictions
-            else:
-                df['wage_percentile'] = df.groupby('continent')['prevailing_wage'].rank(pct=True)
-            
-            # Drop unnecessary columns
-            df.drop(['yr_of_estab'], axis=1, inplace=True, errors='ignore')
-            
-            logging.info("Completed feature engineering")
-            return df
+            return result
             
         except Exception as e:
+            logging.error(f"Prediction failed: {str(e)}")
             raise USvisaException(e, sys) from e
 
-    def get_model(self) -> USvisaEstimator:
+    def validate_inputs(self, dataframe: DataFrame) -> None:
         """
-        Load the model from Azure storage
-        
-        Returns:
-            Loaded model estimator
-        """
-        try:
-            model_path = self.config.model_path
-            
-            # Enhanced validation
-            if not model_path:
-                raise USvisaException("Model path is not configured")
-            
-            if not self.azure_storage.is_blob_exists(model_path):
-                logging.warning(f"Model not found at {model_path}")
-                raise USvisaException(f"Model not found at {model_path}")
-            
-            model = USvisaEstimator(
-                container_name=self.config.container_name,
-                model_path=model_path
-            )
-            
-            logging.info(f"Successfully loaded model from {model_path}")
-            return model
-            
-        except Exception as e:
-            logging.error(f"Error loading model: {str(e)}")
-            raise USvisaException(e, sys) from e
-
-    def predict(self, input_data: USvisaData) -> dict:
-        """
-        Make prediction for given input data
+        Validate input data before prediction
         
         Args:
-            input_data: USvisaData object containing input features
+            dataframe: Input data to validate
             
-        Returns:
-            Dictionary containing prediction and probability
+        Raises:
+            USvisaException: If validation fails
         """
+        required_columns = {
+            "continent", "education_of_employee", "has_job_experience",
+            "requires_job_training", "no_of_employees", "region_of_employment",
+            "prevailing_wage", "unit_of_wage", "full_time_position", "company_age"
+        }
+        
         try:
-            # Convert input to DataFrame
-            input_df = input_data.get_usvisa_input_data_frame()
+            # Check for missing required columns
+            missing_columns = required_columns - set(dataframe.columns)
+            if missing_columns:
+                raise ValueError(f"Missing required columns: {missing_columns}")
             
-            # Perform feature engineering
-            processed_df = self._perform_feature_engineering(input_df)
-            
-            # Load model and make prediction
-            model = self.get_model()
-            prediction = model.predict(processed_df)
-            prediction_proba = model.predict_proba(processed_df)
-            
-            # Convert prediction to human-readable format
-            prediction_mapping = {v: k for k, v in TargetValueMapping()._asdict().items()}
-            visa_status = prediction_mapping.get(prediction[0], "Unknown")
-            probability = float(max(prediction_proba[0]))
-            
-            return {
-                "visa_status": visa_status,
-                "probability": probability,
-                "status": "success",
-                "message": "Prediction completed successfully"
-            }
+            # Validate data types
+            if not isinstance(dataframe['prevailing_wage'].iloc[0], (int, float)):
+                raise ValueError("prevailing_wage must be numeric")
+                
+            if not isinstance(dataframe['no_of_employees'].iloc[0], (int)):
+                raise ValueError("no_of_employees must be integer")
+                
+            if not isinstance(dataframe['company_age'].iloc[0], (int)):
+                raise ValueError("company_age must be integer")
+                
+            logging.info("Input validation completed successfully")
             
         except Exception as e:
-            logging.error(f"Error during prediction: {str(e)}")
-            return {
-                "status": "error",
-                "message": f"Prediction error: {str(e)}",
-                "visa_status": None,
-                "probability": None
-            }
+            logging.error(f"Input validation failed: {str(e)}")
+            raise USvisaException(e, sys) from e

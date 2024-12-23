@@ -1,5 +1,4 @@
 from azure.storage.blob import BlobServiceClient
-# from azure.identity import ClientSecretCredential
 import os
 
 from us_visa_prediction.constants import AZURE_ACCOUNT_URL
